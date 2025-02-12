@@ -1,12 +1,10 @@
 ﻿using System;
 
-// Абстрактний клас для страви
 abstract class Dish
 {
     public abstract string Prepare();
 }
 
-// Конкретні страви
 class Pizza : Dish
 {
     public override string Prepare()
@@ -23,13 +21,11 @@ class Pasta : Dish
     }
 }
 
-// Фабричний метод
 abstract class DishFactory
 {
     public abstract Dish CreateDish();
 }
 
-// Конкретні фабрики
 class PizzaFactory : DishFactory
 {
     public override Dish CreateDish()
@@ -46,7 +42,6 @@ class PastaFactory : DishFactory
     }
 }
 
-// Клієнтський код
 class Program
 {
     static void Main()
