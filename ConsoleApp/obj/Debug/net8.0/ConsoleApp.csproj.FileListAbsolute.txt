@@ -12,3 +12,4 @@ E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\refint\ConsoleApp.dll
 E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.pdb
 E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.genruntimeconfig.cache
 E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ref\ConsoleApp.dll
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.sourcelink.json
