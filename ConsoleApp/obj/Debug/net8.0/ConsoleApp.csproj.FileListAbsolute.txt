@@ -1,0 +1,14 @@
+E:\Programs\ooplabs\ooplab1\ConsoleApp\bin\Debug\net8.0\ConsoleApp.exe
+E:\Programs\ooplabs\ooplab1\ConsoleApp\bin\Debug\net8.0\ConsoleApp.deps.json
+E:\Programs\ooplabs\ooplab1\ConsoleApp\bin\Debug\net8.0\ConsoleApp.runtimeconfig.json
+E:\Programs\ooplabs\ooplab1\ConsoleApp\bin\Debug\net8.0\ConsoleApp.dll
+E:\Programs\ooplabs\ooplab1\ConsoleApp\bin\Debug\net8.0\ConsoleApp.pdb
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.GeneratedMSBuildEditorConfig.editorconfig
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.AssemblyInfoInputs.cache
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.AssemblyInfo.cs
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.csproj.CoreCompileInputs.cache
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.dll
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\refint\ConsoleApp.dll
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.pdb
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ConsoleApp.genruntimeconfig.cache
+E:\Programs\ooplabs\ooplab1\ConsoleApp\obj\Debug\net8.0\ref\ConsoleApp.dll
