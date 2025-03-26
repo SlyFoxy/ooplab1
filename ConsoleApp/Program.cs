@@ -185,6 +185,210 @@ public class Order : ICloneableOrder
     }
 }
 
+//---------------------------- АДАПТЕР -----------------------------------
+public interface IPaymentSystem
+{
+    void ProcessPayment(decimal amount);
+}
+
+public class ExternalPaymentService
+{
+    public void MakePayment(double amount)
+    {
+        Console.WriteLine($"Оплата у зовнішньому сервісі на суму {amount} грн виконана.");
+    }
+}
+
+public class PaymentAdapter : IPaymentSystem
+{
+    private ExternalPaymentService _externalService = new ExternalPaymentService();
+    
+    public void ProcessPayment(decimal amount)
+    {
+        _externalService.MakePayment((double)amount);
+    }
+}
+
+//---------------------------- ФАСАД ------------------------------------
+public class RestaurantFacade
+{
+    private Order _order;
+    private IPaymentSystem _paymentSystem;
+    
+    public RestaurantFacade()
+    {
+        _order = new Order();
+        _paymentSystem = new PaymentAdapter();
+    }
+    
+    public void PlaceOrder(string dish)
+    {
+        _order.AddDish(dish);
+        Console.WriteLine("Замовлення додано.");
+    }
+    
+    public void PayOrder()
+    {
+        decimal amount = _order.GetFinalPrice();
+        _paymentSystem.ProcessPayment(amount);
+    }
+}
+
+//---------------------------- СТАН -------------------------------------
+public interface IOrderState
+{
+    void NextState(OrderContext context);
+    void PrintStatus();
+}
+
+public class PendingState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new CookingState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення очікує на приготування.");
+    }
+}
+
+public class CookingState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new ReadyState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення готується.");
+    }
+}
+
+public class ReadyState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new DeliveredState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення готове до видачі.");
+    }
+}
+
+public class DeliveredState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        Console.WriteLine("Замовлення вже доставлено.");
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення доставлено.");
+    }
+}
+
+public class OrderContext
+{
+    private IOrderState _state;
+    
+    public OrderContext()
+    {
+        _state = new PendingState();
+    }
+    
+    public void SetState(IOrderState state)
+    {
+        _state = state;
+    }
+    
+    public void NextState()
+    {
+        _state.NextState(this);
+    }
+    
+    public void PrintStatus()
+    {
+        _state.PrintStatus();
+    }
+}
+
+//----------------------------LAB 4-----------------------------------------------
+// Макрокоманда
+public class MacroCommand : ICommand
+{
+    private List<ICommand> _commands = new List<ICommand>();
+
+    public void AddCommand(ICommand command)
+    {
+        _commands.Add(command);
+    }
+
+    public void Execute()
+    {
+        foreach (var command in _commands)
+        {
+            command.Execute();
+        }
+    }
+
+    public void Undo()
+    {
+        for (int i = _commands.Count - 1; i >= 0; i--)
+        {
+            _commands[i].Undo();
+        }
+    }
+}
+
+// Шаблонний метод
+public abstract class CookingProcess
+{
+    public void Cook()
+    {
+        PrepareIngredients();
+        CookDish();
+        Serve();
+    }
+
+    protected abstract void PrepareIngredients();
+    protected abstract void CookDish();
+    protected virtual void Serve()
+    {
+        Console.WriteLine("Подача страви.");
+    }
+}
+
+public class PizzaCooking : CookingProcess
+{
+    protected override void PrepareIngredients()
+    {
+        Console.WriteLine("Підготовка тіста, соусу та начинки для піци.");
+    }
+
+    protected override void CookDish()
+    {
+        Console.WriteLine("Випікання піци у печі.");
+    }
+}
+
+public class PastaCooking : CookingProcess
+{
+    protected override void PrepareIngredients()
+    {
+        Console.WriteLine("Підготовка макаронів і соусу.");
+    }
+
+    protected override void CookDish()
+    {
+        Console.WriteLine("Варіння пасти та приготування соусу.");
+    }
+}
 
 class Program
 {
@@ -231,7 +435,42 @@ class Program
         addDish.Execute();
         Console.WriteLine($"Фінальна ціна: {order.GetFinalPrice()} грн");
         addDish.Undo();
+
+        // Використання Адаптера
+        IPaymentSystem payment = new PaymentAdapter();
+        payment.ProcessPayment(250);
+        
+        // Використання Фасаду
+        RestaurantFacade restaurant = new RestaurantFacade();
+        restaurant.PlaceOrder("Піца");
+        restaurant.PayOrder();
+        
+        // Використання Стану
+        OrderContext orderc = new OrderContext();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+
+        // Використання макрокоманди
+        Order order2 = new Order();
+        MacroCommand macroCommand = new MacroCommand();
+        macroCommand.AddCommand(new AddDishCommand(order, "Піца"));
+        macroCommand.AddCommand(new AddDishCommand(order, "Паста"));
+        macroCommand.Execute();
+        macroCommand.Undo();
+
+        // Використання шаблонного методу
+        CookingProcess pizzaProcess = new PizzaCooking();
+        pizzaProcess.Cook();
+        
+        CookingProcess pastaProcess = new PastaCooking();
+        pastaProcess.Cook();
     }
+    
 
     //--------------------LAB 1------------------------------
     static string OrderDish(DishFactory factory)
@@ -239,4 +478,6 @@ class Program
         Dish dish = factory.CreateDish();
         return dish.Prepare();
     }
+
+    
 }
