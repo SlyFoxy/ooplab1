@@ -185,6 +185,236 @@ public class Order : ICloneableOrder
     }
 }
 
+//---------------------------- АДАПТЕР -----------------------------------
+public interface IPaymentSystem
+{
+    void ProcessPayment(decimal amount);
+}
+
+public class ExternalPaymentService
+{
+    public void MakePayment(double amount)
+    {
+        Console.WriteLine($"Оплата у зовнішньому сервісі на суму {amount} грн виконана.");
+    }
+}
+
+public class PaymentAdapter : IPaymentSystem
+{
+    private ExternalPaymentService _externalService = new ExternalPaymentService();
+    
+    public void ProcessPayment(decimal amount)
+    {
+        _externalService.MakePayment((double)amount);
+    }
+}
+
+//---------------------------- ФАСАД ------------------------------------
+public class RestaurantFacade
+{
+    private Order _order;
+    private IPaymentSystem _paymentSystem;
+    
+    public RestaurantFacade()
+    {
+        _order = new Order();
+        _paymentSystem = new PaymentAdapter();
+    }
+    
+    public void PlaceOrder(string dish)
+    {
+        _order.AddDish(dish);
+        Console.WriteLine("Замовлення додано.");
+    }
+    
+    public void PayOrder()
+    {
+        decimal amount = _order.GetFinalPrice();
+        _paymentSystem.ProcessPayment(amount);
+    }
+}
+
+//---------------------------- СТАН -------------------------------------
+public interface IOrderState
+{
+    void NextState(OrderContext context);
+    void PrintStatus();
+}
+
+public class PendingState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new CookingState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення очікує на приготування.");
+    }
+}
+
+public class CookingState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new ReadyState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення готується.");
+    }
+}
+
+public class ReadyState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        context.SetState(new DeliveredState());
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення готове до видачі.");
+    }
+}
+
+public class DeliveredState : IOrderState
+{
+    public void NextState(OrderContext context)
+    {
+        Console.WriteLine("Замовлення вже доставлено.");
+    }
+    
+    public void PrintStatus()
+    {
+        Console.WriteLine("Замовлення доставлено.");
+    }
+}
+
+public class OrderContext
+{
+    private IOrderState _state;
+    
+    public OrderContext()
+    {
+        _state = new PendingState();
+    }
+    
+    public void SetState(IOrderState state)
+    {
+        _state = state;
+    }
+    
+    public void NextState()
+    {
+        _state.NextState(this);
+    }
+    
+    public void PrintStatus()
+    {
+        _state.PrintStatus();
+    }
+}
+
+//--------------------------------- LAB 5
+public interface IOrderIterator
+{
+    bool HasNext();
+    Order Next();
+}
+
+public class OrderIterator : IOrderIterator
+{
+    private readonly List<Order> _orders;
+    private int _position = 0;
+
+    public OrderIterator(List<Order> orders)
+    {
+        _orders = orders;
+    }
+
+    public bool HasNext() => _position < _orders.Count;
+
+    public Order Next() => _orders[_position++];
+}
+
+public class OrderCollection
+{
+    private List<Order> _orders = new List<Order>();
+
+    public void AddOrder(Order order) => _orders.Add(order);
+    public IOrderIterator CreateIterator() => new OrderIterator(_orders);
+}
+
+public abstract class ComplaintHandler
+{
+    protected ComplaintHandler _nextHandler;
+
+    public void SetNext(ComplaintHandler nextHandler) => _nextHandler = nextHandler;
+
+    public abstract void HandleComplaint(string complaint);
+}
+
+public class Manager : ComplaintHandler
+{
+    public override void HandleComplaint(string complaint)
+    {
+        if (complaint.ToLower().Contains("запізн"))
+        {
+            Console.WriteLine("Менеджер: Приношу вибачення за запізнення. Ми виправимо ситуацію.");
+        }
+        else if (_nextHandler != null)
+        {
+            _nextHandler.HandleComplaint(complaint);
+        }
+        else
+        {
+            Console.WriteLine("Менеджер: Скаргу не вдалося обробити.");
+        }
+    }
+}
+
+public class ChefHandler : ComplaintHandler
+{
+    public override void HandleComplaint(string complaint)
+    {
+        if (complaint.ToLower().Contains("страва") || complaint.ToLower().Contains("їжа"))
+        {
+            Console.WriteLine("Шеф-кухар: Перепрошую. Я приготую нову страву.");
+        }
+        else if (_nextHandler != null)
+        {
+            _nextHandler.HandleComplaint(complaint);
+        }
+        else
+        {
+            Console.WriteLine("Шеф-кухар: Скаргу не вдалося обробити.");
+        }
+    }
+}
+
+
+public class DiscountHandler : ComplaintHandler
+{
+    public override void HandleComplaint(string complaint)
+    {
+        if (complaint.ToLower().Contains("знижк") || complaint.ToLower().Contains("дешевше") || complaint.ToLower().Contains("ціна"))
+        {
+            Console.WriteLine("Бухгалтерія: Вам буде надано знижку 10% на наступне замовлення.");
+        }
+        else if (_nextHandler != null)
+        {
+            _nextHandler.HandleComplaint(complaint);
+        }
+        else
+        {
+            Console.WriteLine("Бухгалтерія: Скаргу не вдалося обробити.");
+        }
+    }
+}
+
 
 class Program
 {
@@ -231,6 +461,55 @@ class Program
         addDish.Execute();
         Console.WriteLine($"Фінальна ціна: {order.GetFinalPrice()} грн");
         addDish.Undo();
+
+        // Використання Адаптера
+        IPaymentSystem payment = new PaymentAdapter();
+        payment.ProcessPayment(250);
+        
+        // Використання Фасаду
+        RestaurantFacade restaurant = new RestaurantFacade();
+        restaurant.PlaceOrder("Піца");
+        restaurant.PayOrder();
+        
+        // Використання Стану
+        OrderContext orderc = new OrderContext();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+        orderc.NextState();
+        orderc.PrintStatus();
+
+        // ------------------- ІТЕРАТОР -------------------
+        Console.WriteLine("--- Ітератор ---");
+        OrderCollection collection = new OrderCollection();
+        collection.AddOrder(originalOrder);
+        collection.AddOrder(clonedOrder);
+        collection.AddOrder(customOrder);
+
+        IOrderIterator iterator = collection.CreateIterator();
+        while (iterator.HasNext())
+        {
+            Order current = iterator.Next();
+            current.ShowOrder();
+        }
+
+        // ------------------- ЛАНЦЮЖОК ОБОВ'ЯЗКІВ -------------------
+        Console.WriteLine("--- Ланцюжок обов'язків ---");
+        ComplaintHandler managerHandler = new Manager();
+        ComplaintHandler chefHandler = new ChefHandler(); // нова назва
+        ComplaintHandler discountHandler = new DiscountHandler();
+
+        managerHandler.SetNext(chefHandler);
+        chefHandler.SetNext(discountHandler);
+
+        managerHandler.HandleComplaint("Моє замовлення запізнилося!");
+        managerHandler.HandleComplaint("Моя страва була холодна!");
+        managerHandler.HandleComplaint("Я хочу знижку!");
+
+
+
     }
 
     //--------------------LAB 1------------------------------
@@ -239,4 +518,6 @@ class Program
         Dish dish = factory.CreateDish();
         return dish.Prepare();
     }
-}
+
+    
+} 
