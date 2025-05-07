@@ -415,6 +415,111 @@ public class DiscountHandler : ComplaintHandler
     }
 }
 
+// ------------------ INTERPRETER --------------------------
+public interface IExpression
+{
+    void Interpret(Order order);
+}
+
+public class AddDishExpression : IExpression
+{
+    private string _dish;
+    public AddDishExpression(string dish) => _dish = dish;
+
+    public void Interpret(Order order)
+    {
+        order.AddDish(_dish);
+        Console.WriteLine($"[Interpreter] Додано страву: {_dish}");
+    }
+}
+
+public class RemoveDishExpression : IExpression
+{
+    private string _dish;
+    public RemoveDishExpression(string dish) => _dish = dish;
+
+    public void Interpret(Order order)
+    {
+        order.RemoveDish(_dish);
+        Console.WriteLine($"[Interpreter] Видалено страву: {_dish}");
+    }
+}
+
+public class InterpreterContext
+{
+    public static IExpression Parse(string input)
+    {
+        var parts = input.Split(' ', 2);
+        if (parts.Length != 2) return null;
+
+        string command = parts[0].ToLower();
+        string dish = parts[1];
+
+        return command switch
+        {
+            "додати" => new AddDishExpression(dish),
+            "прибрати" => new RemoveDishExpression(dish),
+            _ => null
+        };
+    }
+}
+
+// ------------------ MEDIATOR -----------------------------
+
+public interface IMediator
+{
+    void Notify(object sender, string ev);
+}
+
+public class KitchenMediator : IMediator
+{
+    public WaiterMediator Waiter { get; set; }
+    public ChefMediator Chef { get; set; }
+    public Order Order { get; set; }
+
+    public void Notify(object sender, string ev)
+    {
+        if (ev == "NewOrder")
+        {
+            Chef.CookDish(Order.Dishes);
+        }
+        else if (ev == "Ready")
+        {
+            Waiter.ServeOrder(Order.Dishes);
+        }
+    }
+}
+
+public class WaiterMediator
+{
+    private IMediator _mediator;
+    public WaiterMediator(IMediator mediator) => _mediator = mediator;
+
+    public void TakeOrder(Order order)
+    {
+        Console.WriteLine("[Mediator] Офіціант прийняв замовлення.");
+        (_mediator as KitchenMediator).Order = order;
+        _mediator.Notify(this, "NewOrder");
+    }
+
+    public void ServeOrder(List<string> dishes)
+    {
+        Console.WriteLine("[Mediator] Офіціант подає: " + string.Join(", ", dishes));
+    }
+}
+
+public class ChefMediator
+{
+    private IMediator _mediator;
+    public ChefMediator(IMediator mediator) => _mediator = mediator;
+
+    public void CookDish(List<string> dishes)
+    {
+        Console.WriteLine("[Mediator] Шеф-кухар готує: " + string.Join(", ", dishes));
+        _mediator.Notify(this, "Ready");
+    }
+}
+
 
 class Program
 {
@@ -498,7 +603,7 @@ class Program
         // ------------------- ЛАНЦЮЖОК ОБОВ'ЯЗКІВ -------------------
         Console.WriteLine("--- Ланцюжок обов'язків ---");
         ComplaintHandler managerHandler = new Manager();
-        ComplaintHandler chefHandler = new ChefHandler(); // нова назва
+        ComplaintHandler chefHandler = new ChefHandler();
         ComplaintHandler discountHandler = new DiscountHandler();
 
         managerHandler.SetNext(chefHandler);
@@ -508,6 +613,39 @@ class Program
         managerHandler.HandleComplaint("Моя страва була холодна!");
         managerHandler.HandleComplaint("Я хочу знижку!");
 
+
+
+        // ------------------- INTERPRETER -------------------
+        Console.WriteLine("--- Interpreter ---");
+        Order interpreterOrder = new Order();
+
+        string[] commands = {
+            "додати бургер",
+            "додати салат",
+            "прибрати салат"
+        };
+
+        foreach (string cmd in commands)
+        {
+            IExpression expr = InterpreterContext.Parse(cmd);
+            expr?.Interpret(interpreterOrder);
+        }
+        interpreterOrder.ShowOrder();
+
+        // ------------------- MEDIATOR ----------------------
+        Console.WriteLine("--- Mediator ---");
+        Order mediatorOrder = new Order();
+        mediatorOrder.AddDish("Паста");
+        mediatorOrder.AddDish("Суп");
+
+        KitchenMediator mediator = new KitchenMediator();
+        WaiterMediator waiterMediator = new WaiterMediator(mediator);
+        ChefMediator chefMediator = new ChefMediator(mediator);
+
+        mediator.Waiter = waiterMediator;
+        mediator.Chef = chefMediator;
+
+        waiterMediator.TakeOrder(mediatorOrder);
 
 
     }
