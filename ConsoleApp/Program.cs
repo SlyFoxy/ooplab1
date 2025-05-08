@@ -1,53 +1,55 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq; // Added for Any() in Facade and Stack in Memento
+using System.Threading; // Added for Thread.Sleep in Proxy
 
-//----------------------------LAB 1-----------------------------------------------
-// Фабричний метод та Абстрактна фабрика
+#region LAB 1: Creational - Factory Method, Abstract Factory
+
+//----------------------------LAB 1 (Фабричний метод та Абстрактна фабрика)-----------------------------------------------
 public abstract class Dish
 {
     public abstract string Prepare();
-    // ДОДАЙТЕ ЦЕЙ АБСТРАКТНИЙ МЕТОД:
-    public abstract void Accept(IDishVisitor visitor); 
+    public abstract void Accept(IDishVisitor visitor); // For LAB 7: Visitor
 }
 
-// В класі Pizza
 public class Pizza : Dish
 {
     public override string Prepare() => "Готується піца з інгредієнтами.";
-    // ДОДАЙТЕ РЕАЛІЗАЦІЮ МЕТОДУ Accept:
     public override void Accept(IDishVisitor visitor)
     {
         visitor.VisitPizza(this);
     }
 }
 
-// В класі Pasta
 public class Pasta : Dish
 {
     public override string Prepare() => "Готується паста з соусом.";
-    // ДОДАЙТЕ РЕАЛІЗАЦІЮ МЕТОДУ Accept:
     public override void Accept(IDishVisitor visitor)
     {
         visitor.VisitPasta(this);
     }
 }
 
-abstract class DishFactory
+public abstract class DishFactory
 {
     public abstract Dish CreateDish();
 }
 
-class PizzaFactory : DishFactory
+public class PizzaFactory : DishFactory
 {
     public override Dish CreateDish() => new Pizza();
 }
 
-class PastaFactory : DishFactory
+public class PastaFactory : DishFactory
 {
     public override Dish CreateDish() => new Pasta();
 }
 
-//----------------------------LAB 2-----------------------------------------------
+#endregion
+
+#region LAB 2: Creational - Prototype, Builder
+
+//----------------------------LAB 2 (Prototype, Builder)-----------------------------------------------
 // Прототип
 public interface ICloneableOrder
 {
@@ -67,7 +69,12 @@ public class OrderBuilder : IOrderBuilder
 
     public void AddDish(string dish) => _order.AddDish(dish);
 
-    public Order Build() => _order;
+    public Order Build() 
+    {
+        Order builtOrder = _order;
+        _order = new Order(); 
+        return builtOrder;
+    }
 }
 
 public class Director
@@ -81,7 +88,11 @@ public class Director
     }
 }
 
-//----------------------------LAB 3-----------------------------------------------
+#endregion
+
+#region LAB 3: Behavioral - Strategy, Observer, Command
+
+//----------------------------LAB 3 (Strategy, Observer, Command)-----------------------------------------------
 // Стратегія
 public interface IPricingStrategy
 {
@@ -165,9 +176,13 @@ public class AddDishCommand : ICommand
     }
 }
 
+#endregion
+
+#region Core Class: Order (Used across multiple labs)
+
 public class Order : ICloneableOrder
 {
-    public decimal BasePrice { get; private set; } = 100; // Залишаємо як є
+    public decimal BasePrice { get; private set; } = 100;
     public List<string> Dishes { get; private set; } = new List<string>();
     public IPricingStrategy PricingStrategy { get; set; }
     public OrderNotifier Notifier { get; private set; } = new OrderNotifier();
@@ -188,37 +203,37 @@ public class Order : ICloneableOrder
 
     public Order Clone()
     {
-        Order copy = new Order { PricingStrategy = this.PricingStrategy, BasePrice = this.BasePrice }; // Копіюємо BasePrice
+        Order copy = new Order { PricingStrategy = this.PricingStrategy, BasePrice = this.BasePrice };
         copy.Dishes.AddRange(this.Dishes);
         return copy;
     }
 
     public void ShowOrder()
     {
-        Console.WriteLine($"Order contains: {string.Join(", ", Dishes)}. Base Price: {BasePrice}. Final Price: {GetFinalPrice()}");
+        Console.WriteLine($"Order contains: {(Dishes.Any() ? string.Join(", ", Dishes) : "порожньо")}. Base Price: {BasePrice:C}. Final Price: {GetFinalPrice():C}");
     }
 
-    // ДОДАЙТЕ ЦІ МЕТОДИ ДЛЯ MEMENTO:
+    // For LAB 7: Memento
     public OrderMemento SaveState()
     {
-        // Створюємо новий Memento з поточним станом
         return new OrderMemento(new List<string>(this.Dishes), this.PricingStrategy, this.BasePrice);
     }
 
     public void RestoreState(OrderMemento memento)
     {
-        // Відновлюємо стан з Memento
-        // Важливо створити нову копію списку, щоб уникнути спільного використання списків
         this.Dishes = new List<string>(memento.SavedDishes);
         this.PricingStrategy = memento.SavedPricingStrategy;
-        this.BasePrice = memento.SavedBasePrice; // BasePrice має private set, тому його можна змінити зсередини класу
-
+        this.BasePrice = memento.SavedBasePrice;
         Console.WriteLine("Стан Замовлення відновлено з Memento.");
-        Notifier.Notify(this); // Повідомляємо спостерігачів про зміну стану
+        Notifier.Notify(this);
     }
 }
 
-//---------------------------- АДАПТЕР -----------------------------------
+#endregion
+
+#region Structural Pattern (Used for Facade in LAB 8, but defined early) - Adapter
+
+//---------------------------- АДАПТЕР (Використовується в Фасаді LAB 8) -----------------------------------
 public interface IPaymentSystem
 {
     void ProcessPayment(decimal amount);
@@ -228,7 +243,7 @@ public class ExternalPaymentService
 {
     public void MakePayment(double amount)
     {
-        Console.WriteLine($"Оплата у зовнішньому сервісі на суму {amount} грн виконана.");
+        Console.WriteLine($"Оплата у зовнішньому сервісі на суму {amount:C} виконана.");
     }
 }
 
@@ -242,32 +257,77 @@ public class PaymentAdapter : IPaymentSystem
     }
 }
 
-//---------------------------- ФАСАД ------------------------------------
+#endregion
+
+#region LAB 8: Facade (part of Structural patterns)
+
+//---------------------------- ФАСАД (LAB 8) ------------------------------------
 public class RestaurantFacade
 {
-    private Order _order;
+    private Order _currentOrder;
     private IPaymentSystem _paymentSystem;
-    
+    private KitchenMediator _kitchenMediator; // For complex interaction, LAB 6
+    private WaiterMediator _waiterMediator;   // For complex interaction, LAB 6
+    private ChefMediator _chefForMediator;    // For complex interaction, LAB 6
+
     public RestaurantFacade()
     {
-        _order = new Order();
+        _currentOrder = new Order();
         _paymentSystem = new PaymentAdapter();
+
+
+        _kitchenMediator = new KitchenMediator();
+        _waiterMediator = new WaiterMediator(_kitchenMediator);
+        _chefForMediator = new ChefMediator(_kitchenMediator);
+        _kitchenMediator.Waiter = _waiterMediator;
+        _kitchenMediator.Chef = _chefForMediator;
     }
     
-    public void PlaceOrder(string dish)
+    public void AddDishToOrder(string dish)
     {
-        _order.AddDish(dish);
-        Console.WriteLine("Замовлення додано.");
+        _currentOrder.AddDish(dish);
+        Console.WriteLine($"[Facade] Страва '{dish}' додана до поточного замовлення.");
+    }
+
+    public void ShowCurrentOrderDetails()
+    {
+        Console.WriteLine("[Facade] Деталі поточного замовлення:");
+        _currentOrder.ShowOrder();
     }
     
-    public void PayOrder()
+    public void PlaceAndPayOrder()
     {
-        decimal amount = _order.GetFinalPrice();
+        if (!_currentOrder.Dishes.Any())
+        {
+            Console.WriteLine("[Facade] Замовлення порожнє. Нічого оплачувати.");
+            return;
+        }
+
+        Console.WriteLine("[Facade] Розміщення та оплата замовлення..."); 
+
+        decimal amount = _currentOrder.GetFinalPrice();
         _paymentSystem.ProcessPayment(amount);
+        Console.WriteLine($"[Facade] Замовлення на суму {amount:C} успішно оплачено.");
+        _currentOrder = new Order(); // Reset for next customer
+    }
+
+    public void OrderComboMealAndPay()
+    {
+        Console.WriteLine("[Facade] Замовлення Комбо-меню...");
+        AddDishToOrder("Бургер Комбо");
+        AddDishToOrder("Картопля Фрі Комбо");
+        AddDishToOrder("Напій Комбо");
+        _currentOrder.PricingStrategy = new DiscountPricing(); 
+        ShowCurrentOrderDetails();
+        PlaceAndPayOrder();
     }
 }
 
-//---------------------------- СТАН -------------------------------------
+#endregion
+
+#region LAB 5: Behavioral - State, Iterator, Chain of Responsibility
+
+//---------------------------- СТАН (LAB 5) -------------------------------------
 public interface IOrderState
 {
     void NextState(OrderContext context);
@@ -276,54 +336,26 @@ public interface IOrderState
 
 public class PendingState : IOrderState
 {
-    public void NextState(OrderContext context)
-    {
-        context.SetState(new CookingState());
-    }
-    
-    public void PrintStatus()
-    {
-        Console.WriteLine("Замовлення очікує на приготування.");
-    }
+    public void NextState(OrderContext context) => context.SetState(new CookingState());
+    public void PrintStatus() => Console.WriteLine("Стан замовлення: Очікує на приготування.");
 }
 
 public class CookingState : IOrderState
 {
-    public void NextState(OrderContext context)
-    {
-        context.SetState(new ReadyState());
-    }
-    
-    public void PrintStatus()
-    {
-        Console.WriteLine("Замовлення готується.");
-    }
+    public void NextState(OrderContext context) => context.SetState(new ReadyState());
+    public void PrintStatus() => Console.WriteLine("Стан замовлення: Готується.");
 }
 
 public class ReadyState : IOrderState
 {
-    public void NextState(OrderContext context)
-    {
-        context.SetState(new DeliveredState());
-    }
-    
-    public void PrintStatus()
-    {
-        Console.WriteLine("Замовлення готове до видачі.");
-    }
+    public void NextState(OrderContext context) => context.SetState(new DeliveredState());
+    public void PrintStatus() => Console.WriteLine("Стан замовлення: Готове до видачі.");
 }
 
 public class DeliveredState : IOrderState
 {
-    public void NextState(OrderContext context)
-    {
-        Console.WriteLine("Замовлення вже доставлено.");
-    }
-    
-    public void PrintStatus()
-    {
-        Console.WriteLine("Замовлення доставлено.");
-    }
+    public void NextState(OrderContext context) => Console.WriteLine("Замовлення вже доставлено.");
+    public void PrintStatus() => Console.WriteLine("Стан замовлення: Доставлено.");
 }
 
 public class OrderContext
@@ -335,23 +367,12 @@ public class OrderContext
         _state = new PendingState();
     }
     
-    public void SetState(IOrderState state)
-    {
-        _state = state;
-    }
-    
-    public void NextState()
-    {
-        _state.NextState(this);
-    }
-    
-    public void PrintStatus()
-    {
-        _state.PrintStatus();
-    }
+    public void SetState(IOrderState state) => _state = state;
+    public void NextState() => _state.NextState(this);
+    public void PrintStatus() => _state.PrintStatus();
 }
 
-//--------------------------------- LAB 5
+//--------------------------------- ІТЕРАТОР (LAB 5) ---------------------------------
 public interface IOrderIterator
 {
     bool HasNext();
@@ -363,13 +384,8 @@ public class OrderIterator : IOrderIterator
     private readonly List<Order> _orders;
     private int _position = 0;
 
-    public OrderIterator(List<Order> orders)
-    {
-        _orders = orders;
-    }
-
+    public OrderIterator(List<Order> orders) => _orders = orders;
     public bool HasNext() => _position < _orders.Count;
-
     public Order Next() => _orders[_position++];
 }
 
@@ -381,12 +397,12 @@ public class OrderCollection
     public IOrderIterator CreateIterator() => new OrderIterator(_orders);
 }
 
+//--------------------------------- ЛАНЦЮЖОК ОБОВ'ЯЗКІВ (LAB 5) --------------------
 public abstract class ComplaintHandler
 {
     protected ComplaintHandler _nextHandler;
 
     public void SetNext(ComplaintHandler nextHandler) => _nextHandler = nextHandler;
-
     public abstract void HandleComplaint(string complaint);
 }
 
@@ -428,7 +444,6 @@ public class ChefHandler : ComplaintHandler
     }
 }
 
-
 public class DiscountHandler : ComplaintHandler
 {
     public override void HandleComplaint(string complaint)
@@ -448,7 +463,11 @@ public class DiscountHandler : ComplaintHandler
     }
 }
 
-// ------------------ INTERPRETER --------------------------
+#endregion
+
+#region LAB 6: Behavioral - Interpreter, Mediator
+
+// ------------------ INTERPRETER (LAB 6) --------------------------
 public interface IExpression
 {
     void Interpret(Order order);
@@ -482,7 +501,7 @@ public class InterpreterContext
 {
     public static IExpression Parse(string input)
     {
-        var parts = input.Split(' ', 2);
+        var parts = input.Split(new[] { ' ' }, 2);
         if (parts.Length != 2) return null;
 
         string command = parts[0].ToLower();
@@ -497,8 +516,7 @@ public class InterpreterContext
     }
 }
 
-// ------------------ MEDIATOR -----------------------------
-
+// ------------------ MEDIATOR (LAB 6) -----------------------------
 public interface IMediator
 {
     void Notify(object sender, string ev);
@@ -506,19 +524,21 @@ public interface IMediator
 
 public class KitchenMediator : IMediator
 {
-    public WaiterMediator Waiter { get; set; }
+    public WaiterMediator Waiter { get; set; } 
     public ChefMediator Chef { get; set; }
     public Order Order { get; set; }
 
     public void Notify(object sender, string ev)
     {
-        if (ev == "NewOrder")
+        if (ev == "NewOrder" && sender is WaiterMediator)
         {
-            Chef.CookDish(Order.Dishes);
+            Console.WriteLine("[KitchenMediator] Отримано NewOrder від Офіціанта. Інформую Шефа.");
+            Chef?.CookDish(Order.Dishes);
         }
-        else if (ev == "Ready")
+        else if (ev == "Ready" && sender is ChefMediator)
         {
-            Waiter.ServeOrder(Order.Dishes);
+            Console.WriteLine("[KitchenMediator] Отримано Ready від Шефа. Інформую Офіціанта.");
+            Waiter?.ServeOrder(Order.Dishes);
         }
     }
 }
@@ -530,14 +550,14 @@ public class WaiterMediator
 
     public void TakeOrder(Order order)
     {
-        Console.WriteLine("[Mediator] Офіціант прийняв замовлення.");
-        (_mediator as KitchenMediator).Order = order;
+        Console.WriteLine("[WaiterColleague] Офіціант прийняв замовлення.");
+        if (_mediator is KitchenMediator km) km.Order = order; 
         _mediator.Notify(this, "NewOrder");
     }
 
     public void ServeOrder(List<string> dishes)
     {
-        Console.WriteLine("[Mediator] Офіціант подає: " + string.Join(", ", dishes));
+        Console.WriteLine("[WaiterColleague] Офіціант подає: " + string.Join(", ", dishes));
     }
 }
 
@@ -548,13 +568,17 @@ public class ChefMediator
 
     public void CookDish(List<string> dishes)
     {
-        Console.WriteLine("[Mediator] Шеф-кухар готує: " + string.Join(", ", dishes));
+        Console.WriteLine("[ChefColleague] Шеф-кухар готує: " + string.Join(", ", dishes));
+        Thread.Sleep(500);
         _mediator.Notify(this, "Ready");
     }
 }
 
-//----------------------------LAB 7: MEMENTO--------------------------------------
-// Memento: Зберігає стан об'єкта Order
+#endregion
+
+#region LAB 7: Behavioral - Memento, Visitor
+
+//----------------------------MEMENTO (LAB 7)--------------------------------------
 public class OrderMemento
 {
     public List<string> SavedDishes { get; }
@@ -564,21 +588,17 @@ public class OrderMemento
     public OrderMemento(List<string> dishes, IPricingStrategy pricingStrategy, decimal basePrice)
     {
         SavedDishes = new List<string>(dishes); 
-        SavedPricingStrategy = pricingStrategy; // Стратегію можна передавати за посиланням, якщо вона незмінна
+        SavedPricingStrategy = pricingStrategy;
         SavedBasePrice = basePrice;
     }
 }
 
-// Caretaker: Відповідає за збереження та відновлення Memento
 public class OrderCaretaker
 {
     private Stack<OrderMemento> _mementos = new Stack<OrderMemento>();
     private Order _originator;
 
-    public OrderCaretaker(Order originator)
-    {
-        _originator = originator;
-    }
+    public OrderCaretaker(Order originator) => _originator = originator;
 
     public void Backup()
     {
@@ -588,12 +608,11 @@ public class OrderCaretaker
 
     public void Undo()
     {
-        if (_mementos.Count == 0)
+        if (!_mementos.Any())
         {
             Console.WriteLine("Caretaker: Немає збережених станів для відновлення.");
             return;
         }
-
         var memento = _mementos.Pop();
         Console.WriteLine("Caretaker: Відновлюю Замовлення до попереднього стану...");
         _originator.RestoreState(memento);
@@ -601,28 +620,26 @@ public class OrderCaretaker
 
     public void ShowHistory()
     {
-        if (_mementos.Count == 0)
+        if (!_mementos.Any())
         {
             Console.WriteLine("Caretaker: Історія порожня.");
             return;
         }
         Console.WriteLine("Caretaker: Історія збережених станів (останній зверху):");
-        foreach (var memento in _mementos)
+        foreach (var memento in _mementos.Reverse())
         {
-            Console.WriteLine($" - Стан: {memento.SavedDishes.Count} страв(и), Базова ціна: {memento.SavedBasePrice}, Стратегія: {memento.SavedPricingStrategy?.GetType().Name ?? "None"}");
+            Console.WriteLine($" - Стан: {memento.SavedDishes.Count} страв(и), Базова ціна: {memento.SavedBasePrice:C}, Стратегія: {memento.SavedPricingStrategy?.GetType().Name ?? "None"}");
         }
     }
 }
 
-//----------------------------LAB 7: VISITOR--------------------------------------
-// Інтерфейс Відвідувача
+//----------------------------VISITOR (LAB 7)--------------------------------------
 public interface IDishVisitor
 {
     void VisitPizza(Pizza pizza);
     void VisitPasta(Pasta pasta);
 }
 
-// Конкретний Відвідувач: виводить інформацію про тип страви
 public class DishInfoVisitor : IDishVisitor
 {
     public void VisitPizza(Pizza pizza)
@@ -638,174 +655,319 @@ public class DishInfoVisitor : IDishVisitor
 
 public class CalorieCheckVisitor : IDishVisitor
 {
-    public void VisitPizza(Pizza pizza)
-    {
-        Console.WriteLine("[Visitor] Піца: приблизно 800 ккал.");
-    }
+    public void VisitPizza(Pizza pizza) => Console.WriteLine("[Visitor] Піца: приблизно 800 ккал.");
+    public void VisitPasta(Pasta pasta) => Console.WriteLine("[Visitor] Паста: приблизно 600 ккал.");
+}
 
-    public void VisitPasta(Pasta pasta)
+#endregion
+
+#region LAB 8: Structural - Proxy, Bridge (Facade is also LAB 8)
+
+//----------------------------PROXY (LAB 8)--------------------------------------
+public interface ICookingService
+{
+    Dish PrepareSpecialDish(string dishName);
+}
+
+public class RealCookingService : ICookingService
+{
+    public Dish PrepareSpecialDish(string dishName)
     {
-        Console.WriteLine("[Visitor] Паста: приблизно 600 ккал.");
+        Console.WriteLine($"[RealCookingService] Готується дуже особлива страва: {dishName}. Це займає багато часу і ресурсів...");
+        Thread.Sleep(1000); 
+        if (dishName.ToLower() == "секретна страва від шефа")
+        {
+            var secretPizza = new Pizza(); 
+            Console.WriteLine($"[RealCookingService] {dishName} готова!");
+            return secretPizza;
+        }
+        Console.WriteLine($"[RealCookingService] Страва {dishName} не є нашою спеціалізацією сьогодні.");
+        return null;
     }
 }
+
+public class CookingServiceProxy : ICookingService
+{
+    private RealCookingService _realService;
+    private List<string> _allowedUsersForSecretDish;
+
+    public CookingServiceProxy(List<string> allowedUsers)
+    {
+        _allowedUsersForSecretDish = allowedUsers ?? new List<string>();
+    }
+
+    public Dish PrepareSpecialDish(string dishName)
+    {
+        if (dishName.ToLower() == "секретна страва від шефа")
+        {
+            Console.Write("Введіть ваше ім'я для замовлення секретної страви: ");
+            string currentUser = Console.ReadLine();
+
+            if (CanUserOrderSecretDish(currentUser))
+            {
+                Console.WriteLine($"[Proxy] Користувач '{currentUser}' має доступ. Передаємо запит реальному сервісу.");
+                if (_realService == null)
+                {
+                    Console.WriteLine("[Proxy] Ініціалізуємо реальний сервіс приготування...");
+                    _realService = new RealCookingService();
+                }
+                return _realService.PrepareSpecialDish(dishName);
+            }
+            else
+            {
+                Console.WriteLine($"[Proxy] Доступ заборонено! Користувач '{currentUser}' не може замовити '{dishName}'.");
+                return null;
+            }
+        }
+        else
+        {
+            Console.WriteLine($"[Proxy] Запит на звичайну страву '{dishName}'. Передаємо реальному сервісу (якщо він потрібен).");
+            if (_realService == null) _realService = new RealCookingService();
+            return _realService.PrepareSpecialDish(dishName); 
+        }
+    }
+
+    private bool CanUserOrderSecretDish(string userName)
+    {
+        return !string.IsNullOrWhiteSpace(userName) && 
+               _allowedUsersForSecretDish.Contains(userName.Trim().ToLower());
+    }
+}
+
+//----------------------------BRIDGE (LAB 8)--------------------------------------
+public interface IDishServingStyle // Implementor
+{
+    void Serve(Dish dish);
+    string GetServingDescription();
+}
+
+public class DineInServingStyle : IDishServingStyle // ConcreteImplementor A
+{
+    public void Serve(Dish dish) => Console.WriteLine($"[DineInServing] Страва '{dish.GetType().Name}' подається на красивій тарілці з приборами.");
+    public string GetServingDescription() => "Подача в залі ресторану";
+}
+
+public class TakeAwayServingStyle : IDishServingStyle // ConcreteImplementor B
+{
+    public void Serve(Dish dish) => Console.WriteLine($"[TakeAwayServing] Страва '{dish.GetType().Name}' ретельно запакована в контейнер для виносу.");
+    public string GetServingDescription() => "Запаковано на виніс";
+}
+
+public abstract class ServableDish // Abstraction
+{
+    protected Dish _dishType;
+    protected IDishServingStyle _servingStyle;
+
+    protected ServableDish(Dish dish, IDishServingStyle servingStyle)
+    {
+        _dishType = dish;
+        _servingStyle = servingStyle;
+    }
+
+    public abstract void PresentDish();
+    public void SetServingStyle(IDishServingStyle servingStyle)
+    {
+        _servingStyle = servingStyle;
+        Console.WriteLine($"[ServableDish] Змінено стиль подачі на: {_servingStyle.GetServingDescription()}");
+    }
+}
+
+public class PreparedPizza : ServableDish // RefinedAbstraction A
+{
+    public PreparedPizza(Pizza pizza, IDishServingStyle servingStyle) : base(pizza, servingStyle) { }
+
+    public override void PresentDish()
+    {
+        Console.WriteLine($"[PreparedPizza] Готуємо до подачі піцу...");
+        _dishType.Prepare();
+        _servingStyle.Serve(_dishType);
+    }
+}
+
+public class PreparedPasta : ServableDish // RefinedAbstraction B
+{
+    public PreparedPasta(Pasta pasta, IDishServingStyle servingStyle) : base(pasta, servingStyle) { }
+
+    public override void PresentDish()
+    {
+        Console.WriteLine($"[PreparedPasta] Готуємо до подачі пасту...");
+        _dishType.Prepare();
+        _servingStyle.Serve(_dishType);
+    }
+}
+
+#endregion
+
+#region Main Program Logic
 
 class Program
 {
     static void Main()
     {
-        //------------------------LAB 1-----------------------------------
+        Console.OutputEncoding = System.Text.Encoding.UTF8;
+
+        #region LAB 1 Demo
+        Console.WriteLine("------------------------LAB 1: FACTORIES-----------------------------------");
         DishFactory pizzaFactory = new PizzaFactory();
         DishFactory pastaFactory = new PastaFactory();
         
         Console.WriteLine(OrderDish(pizzaFactory));
         Console.WriteLine(OrderDish(pastaFactory));
+        #endregion
 
-        //----------------------LAB 2-------------------------------------
+        #region LAB 2 Demo
+        Console.WriteLine("\n----------------------LAB 2: PROTOTYPE & BUILDER--------------------------");
         Console.WriteLine("--- Prototype Pattern ---");
         Order originalOrder = new Order();
-        originalOrder.AddDish("Pizza");
-        originalOrder.AddDish("Pasta");
+        originalOrder.AddDish("Pizza Original");
+        originalOrder.AddDish("Pasta Original");
+        originalOrder.ShowOrder();
 
         Order clonedOrder = originalOrder.Clone();
+        clonedOrder.AddDish("Cola Cloned"); 
+        Console.WriteLine("Cloned order:");
         clonedOrder.ShowOrder();
+        Console.WriteLine("Original after cloning (should be unchanged):");
+        originalOrder.ShowOrder();
 
-        Console.WriteLine("--- Builder Pattern ---");
+
+        Console.WriteLine("\n--- Builder Pattern ---");
         IOrderBuilder builder = new OrderBuilder();
         builder.AddDish("Steak");
         builder.AddDish("Salad");
-
         Order customOrder = builder.Build();
         customOrder.ShowOrder();
 
         Director director = new Director();
         Order comboMeal = director.CreateComboMeal(new OrderBuilder());
         comboMeal.ShowOrder();
+        #endregion
 
-        //----------------------LAB 3-------------------------------------
-        Order order = new Order();
-        order.PricingStrategy = new DiscountPricing();
+        #region LAB 3 Demo
+        Console.WriteLine("\n----------------------LAB 3: STRATEGY, OBSERVER, COMMAND--------------------");
+        Order orderForLab3 = new Order();
+        orderForLab3.PricingStrategy = new DiscountPricing();
 
-        Waiter waiter = new Waiter();
-        Chef chef = new Chef();
-        order.Notifier.Attach(waiter);
-        order.Notifier.Attach(chef);
+        Waiter waiterObserver = new Waiter();
+        Chef chefObserver = new Chef();
+        orderForLab3.Notifier.Attach(waiterObserver);
+        orderForLab3.Notifier.Attach(chefObserver);
 
-        ICommand addDish = new AddDishCommand(order, "Піца");
-        addDish.Execute();
-        Console.WriteLine($"Фінальна ціна: {order.GetFinalPrice()} грн");
-        addDish.Undo();
+        ICommand addDishCmd = new AddDishCommand(orderForLab3, "Піца Команда");
+        addDishCmd.Execute();
+        Console.WriteLine($"Фінальна ціна: {orderForLab3.GetFinalPrice():C}");
+        addDishCmd.Undo();
+        orderForLab3.ShowOrder();
+        #endregion
 
-        // Використання Адаптера
-        IPaymentSystem payment = new PaymentAdapter();
-        payment.ProcessPayment(250);
+        #region Adapter Demo (early definition, used in LAB 8 Facade)
+        Console.WriteLine("\n--- Adapter (Demonstrated early, used by Facade) ---");
+        IPaymentSystem paymentSystemAdapter = new PaymentAdapter();
+        paymentSystemAdapter.ProcessPayment(250.75m);
+        #endregion
         
-        // Використання Фасаду
-        RestaurantFacade restaurant = new RestaurantFacade();
-        restaurant.PlaceOrder("Піца");
-        restaurant.PayOrder();
-        
-        // Використання Стану
-        OrderContext orderc = new OrderContext();
-        orderc.PrintStatus();
-        orderc.NextState();
-        orderc.PrintStatus();
-        orderc.NextState();
-        orderc.PrintStatus();
-        orderc.NextState();
-        orderc.PrintStatus();
+        #region LAB 5 Demo: State, Iterator, Chain of Responsibility
+        Console.WriteLine("\n----------------------LAB 5: STATE, ITERATOR, CoR-------------------------");
+        Console.WriteLine("--- State Pattern ---");
+        OrderContext orderStateContext = new OrderContext();
+        orderStateContext.PrintStatus();
+        orderStateContext.NextState();
+        orderStateContext.PrintStatus();
+        orderStateContext.NextState();
+        orderStateContext.PrintStatus();
+        orderStateContext.NextState();
+        orderStateContext.PrintStatus();
 
-        // ------------------- ІТЕРАТОР -------------------
-        Console.WriteLine("--- Ітератор ---");
-        OrderCollection collection = new OrderCollection();
-        collection.AddOrder(originalOrder);
-        collection.AddOrder(clonedOrder);
-        collection.AddOrder(customOrder);
+        Console.WriteLine("\n--- Iterator Pattern ---");
+        OrderCollection orderCollection = new OrderCollection();
+        orderCollection.AddOrder(originalOrder);
+        orderCollection.AddOrder(clonedOrder);
+        orderCollection.AddOrder(customOrder);
 
-        IOrderIterator iterator = collection.CreateIterator();
-        while (iterator.HasNext())
+        IOrderIterator orderIterator = orderCollection.CreateIterator();
+        while (orderIterator.HasNext())
         {
-            Order current = iterator.Next();
-            current.ShowOrder();
+            Order currentIteratedOrder = orderIterator.Next();
+            currentIteratedOrder.ShowOrder();
         }
 
-        // ------------------- ЛАНЦЮЖОК ОБОВ'ЯЗКІВ -------------------
-        Console.WriteLine("--- Ланцюжок обов'язків ---");
-        ComplaintHandler managerHandler = new Manager();
-        ComplaintHandler chefHandler = new ChefHandler();
-        ComplaintHandler discountHandler = new DiscountHandler();
+        Console.WriteLine("\n--- Chain of Responsibility Pattern ---");
+        ComplaintHandler managerCoR = new Manager(); 
+        ComplaintHandler chefCoR = new ChefHandler(); 
+        ComplaintHandler discountCoR = new DiscountHandler(); 
 
-        managerHandler.SetNext(chefHandler);
-        chefHandler.SetNext(discountHandler);
+        managerCoR.SetNext(chefCoR);
+        chefCoR.SetNext(discountCoR);
 
-        managerHandler.HandleComplaint("Моє замовлення запізнилося!");
-        managerHandler.HandleComplaint("Моя страва була холодна!");
-        managerHandler.HandleComplaint("Я хочу знижку!");
+        managerCoR.HandleComplaint("Моє замовлення запізнилося!");
+        managerCoR.HandleComplaint("Моя страва була холодна!");
+        managerCoR.HandleComplaint("Я хочу знижку!");
+        managerCoR.HandleComplaint("Невідома скарга."); 
+        #endregion
 
-
-
-        // ------------------- INTERPRETER -------------------
-        Console.WriteLine("--- Interpreter ---");
+        #region LAB 6 Demo: Interpreter, Mediator
+        Console.WriteLine("\n----------------------LAB 6: INTERPRETER, MEDIATOR-------------------------");
+        Console.WriteLine("--- Interpreter Pattern ---");
         Order interpreterOrder = new Order();
-
-        string[] commands = {
-            "додати бургер",
-            "додати салат",
-            "прибрати салат"
+        string[] commandsToInterpret = {
+            "додати Бургер Інтерпретер",
+            "додати Салат Інтерпретер",
+            "прибрати Салат Інтерпретер"
         };
-
-        foreach (string cmd in commands)
+        foreach (string cmdStr in commandsToInterpret)
         {
-            IExpression expr = InterpreterContext.Parse(cmd);
+            IExpression expr = InterpreterContext.Parse(cmdStr);
             expr?.Interpret(interpreterOrder);
         }
         interpreterOrder.ShowOrder();
 
-        // ------------------- MEDIATOR ----------------------
-        Console.WriteLine("--- Mediator ---");
+        Console.WriteLine("\n--- Mediator Pattern ---");
         Order mediatorOrder = new Order();
-        mediatorOrder.AddDish("Паста");
-        mediatorOrder.AddDish("Суп");
+        mediatorOrder.AddDish("Паста Медіатор");
+        mediatorOrder.AddDish("Суп Медіатор");
 
-        KitchenMediator mediator = new KitchenMediator();
-        WaiterMediator waiterMediator = new WaiterMediator(mediator);
-        ChefMediator chefMediator = new ChefMediator(mediator);
+        KitchenMediator kitchenMediatorInstance = new KitchenMediator();
+        WaiterMediator waiterColleague = new WaiterMediator(kitchenMediatorInstance); 
+        ChefMediator chefColleague = new ChefMediator(kitchenMediatorInstance);     
 
-        mediator.Waiter = waiterMediator;
-        mediator.Chef = chefMediator;
+        kitchenMediatorInstance.Waiter = waiterColleague;
+        kitchenMediatorInstance.Chef = chefColleague;
 
-        waiterMediator.TakeOrder(mediatorOrder);
+        waiterColleague.TakeOrder(mediatorOrder);
+        #endregion
 
-        Console.WriteLine("\n\n----------------------LAB 7: MEMENTO------------------------------");
+        #region LAB 7 Demo: Memento, Visitor
+        Console.WriteLine("\n\n----------------------LAB 7: MEMENTO, VISITOR------------------------------");
+        Console.WriteLine("--- Memento Pattern ---");
         Order orderForMemento = new Order();
         OrderCaretaker caretaker = new OrderCaretaker(orderForMemento);
 
         Console.WriteLine("Початковий стан Замовлення:");
         orderForMemento.ShowOrder();
-        caretaker.Backup();
+        caretaker.Backup(); 
 
-        orderForMemento.AddDish("Салат Цезар");
-        orderForMemento.PricingStrategy = new PremiumPricing();
+        orderForMemento.AddDish("Салат Цезар Memento");
+        orderForMemento.PricingStrategy = new PremiumPricing(); 
         Console.WriteLine("\nЗамовлення після додавання 'Салат Цезар' та зміни стратегії:");
         orderForMemento.ShowOrder();
-        caretaker.Backup();
+        caretaker.Backup(); 
 
-        orderForMemento.AddDish("Сік апельсиновий");
+        orderForMemento.AddDish("Сік апельсиновий Memento");
         Console.WriteLine("\nЗамовлення після додавання 'Сік апельсиновий':");
         orderForMemento.ShowOrder();
      
-
         Console.WriteLine("\n--- Відновлення станів ---");
         caretaker.Undo(); 
-        Console.WriteLine("Замовлення після першого Undo (повинен бути 'Салат Цезар', PremiumPricing):");
+        Console.WriteLine("Замовлення після першого Undo:");
         orderForMemento.ShowOrder();
 
         caretaker.Undo(); 
-        Console.WriteLine("\nЗамовлення після другого Undo (початковий стан):");
+        Console.WriteLine("\nЗамовлення після другого Undo:");
         orderForMemento.ShowOrder();
 
         caretaker.ShowHistory();
 
-        Console.WriteLine("\n\n----------------------LAB 7: VISITOR------------------------------");
+        Console.WriteLine("\n\n--- Visitor Pattern ---");
         List<Dish> dishesToVisit = new List<Dish>
         {
             pizzaFactory.CreateDish(), 
@@ -827,15 +989,67 @@ class Program
         {
             dishItem.Accept(calorieVisitor);
         }
+        #endregion
 
+        #region LAB 8 Demo: Facade, Proxy, Bridge
+        Console.WriteLine("\n\n----------------------LAB 8: FACADE, PROXY, BRIDGE------------------------------");
+        
+        Console.WriteLine("\n--- Facade Pattern (Розширений приклад) ---");
+        RestaurantFacade facade = new RestaurantFacade();
+        facade.AddDishToOrder("Паста Карбонара Facade");
+        facade.AddDishToOrder("Салат Грецький Facade");
+        facade.ShowCurrentOrderDetails();
+        facade.PlaceAndPayOrder();
+
+        Console.WriteLine("\n--- Facade: Замовлення Комбо ---");
+        facade.OrderComboMealAndPay();
+
+        Console.WriteLine("\n\n--- Proxy Pattern ---");
+        ICookingService cookingService = new CookingServiceProxy(new List<string> { "admin", "vip_client" });
+
+        Console.WriteLine("\nСпроба замовити секретну страву (введіть 'guest' або щось інше):");
+        Dish secretDish1 = cookingService.PrepareSpecialDish("секретна страва від шефа");
+        if (secretDish1 != null) Console.WriteLine($"Отримано: {secretDish1.Prepare()}");
+        
+        Console.WriteLine("\nСпроба замовити секретну страву (введіть 'admin'):");
+        Dish secretDish2 = cookingService.PrepareSpecialDish("секретна страва від шефа");
+        if (secretDish2 != null) Console.WriteLine($"Отримано: {secretDish2.Prepare()}");
+
+        Console.WriteLine("\nСпроба замовити іншу страву (не секретну):");
+        Dish regularSpecialDish = cookingService.PrepareSpecialDish("Фірмовий стейк");
+        if (regularSpecialDish != null) Console.WriteLine($"Отримано: {regularSpecialDish.Prepare()}");
+        
+
+        Console.WriteLine("\n\n--- Bridge Pattern ---");
+        Pizza myBridgePizza = new Pizza(); 
+        Pasta myBridgePasta = new Pasta(); 
+
+        IDishServingStyle dineInStyle = new DineInServingStyle();
+        IDishServingStyle takeAwayStyle = new TakeAwayServingStyle();
+
+        ServableDish pizzaForRestaurant = new PreparedPizza(myBridgePizza, dineInStyle);
+        Console.WriteLine("Подача піци в ресторані:");
+        pizzaForRestaurant.PresentDish();
+
+        ServableDish pastaForTakeAway = new PreparedPasta(myBridgePasta, takeAwayStyle);
+        Console.WriteLine("\nПодача пасти на виніс:");
+        pastaForTakeAway.PresentDish();
+        
+        Console.WriteLine("\nЗмінюємо стиль подачі піци на 'на виніс':");
+        pizzaForRestaurant.SetServingStyle(takeAwayStyle);
+        pizzaForRestaurant.PresentDish();
+        #endregion
+
+        Console.WriteLine("\n\nНатисніть будь-яку клавішу для виходу...");
+        Console.ReadKey();
     }
 
-    //--------------------LAB 1------------------------------
+    // Helper method for LAB 1 Demo
     static string OrderDish(DishFactory factory)
     {
         Dish dish = factory.CreateDish();
         return dish.Prepare();
     }
+}
 
-    
-} 
+#endregion
